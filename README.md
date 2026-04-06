@@ -1,7 +1,7 @@
 # Sinilink XY-WFTX (Local UDP) — Home Assistant integration
 
 <p align="center">
-  <img src="assets/brand/icon.png" width="128" alt="Sinilink XY-WFTX chamber heater">
+  <img src="assets/brand/icon@2x.png" width="256" alt="Sinilink XY-WFTX chamber heater">
 </p>
 
 **Read-only** local monitoring of the Sinilink XY-WFTX WiFi thermostat over its UDP/1024 status endpoint. No cloud, no firmware flashing.
