@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sinilink XY-WFTX",
+        "description": "Add a Sinilink thermostat. Choose how to find the device.",
+        "menu_options": {
+          "scan": "Scan network (broadcast)",
+          "manual": "Enter IP and MAC manually"
+        }
+      },
+      "scan": {
+        "title": "Discovered devices",
+        "description": "Pick the device to add.",
+        "data": {
+          "device": "Device"
+        }
+      },
+      "manual": {
+        "title": "Manual entry",
+        "data": {
+          "host": "IP address",
+          "mac": "MAC address (AA:BB:CC:DD:EE:FF)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the device on UDP/1024.",
+      "invalid_response": "Device replied but the response could not be parsed.",
+      "mac_mismatch": "The device replied with a different MAC than entered.",
+      "discovery_failed": "Broadcast discovery failed on this network.",
+      "no_devices_found": "No Sinilink devices replied to the broadcast."
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  }
+}
