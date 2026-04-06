@@ -16,6 +16,9 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
+          # Brands assets require a PR to home-assistant/brands which takes
+          # days to merge. Ignored here until that PR lands so CI stays green.
+          ignore: brands
 
   hassfest:
     name: Hassfest validation
