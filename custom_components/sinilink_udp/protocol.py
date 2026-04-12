@@ -1,12 +1,16 @@
-"""Pure UDP protocol for Sinilink XY-WFTX devices.
+"""Protocol for Sinilink XY-WFTX devices.
 
 No Home Assistant imports — this module is unit-testable in isolation.
 
-Protocol summary (see reverse-engineering guide §2):
-  * Device listens on UDP/1024.
-  * Discovery: send the ASCII bytes ``SINILINK521`` to the device IP.
-  * Reply format: ``MAC,{"MAC":"...","time":EPOCH,"param":[...]}``
-  * Control: send ``MAC{"MAC":"...","time":EPOCH,"param":[...]}`` (no comma).
+UDP status protocol:
+  * Device listens on UDP/1024 (read-only).
+  * Discovery: send ``SINILINK521`` to the device IP.
+  * Reply: JSON with ``param`` array.
+
+MQTT control protocol:
+  * Device connects to broker on port 1884 (raw MQTT, anonymous).
+  * Status topic: ``PROWT{MAC}`` — same JSON as UDP, every ~30s.
+  * Command topic: ``APPWT{MAC}`` — JSON ``{"method":"...","param":...,"time":epoch}``.
 """
 from __future__ import annotations
 
@@ -26,11 +30,13 @@ from .const import (
     PARAM_ALARM_LOW,
     PARAM_ALARM_LOW_ENABLE,
     PARAM_CURRENT_TEMP,
+    PARAM_DELAY_ENABLE,
+    PARAM_DELAY_VALUE,
     PARAM_ESTOP,
-    PARAM_LED,
-    PARAM_NOTIFICATIONS,
     PARAM_HEAT_COOL,
+    PARAM_LED,
     PARAM_MODE,
+    PARAM_NOTIFICATIONS,
     PARAM_RELAY,
     PARAM_START_TEMP,
     PARAM_STOP_TEMP,
@@ -65,6 +71,8 @@ class SinilinkStatus:
     alarm_low: float | None
     alarm_low_enabled: bool
     estop: bool
+    delay_value: int
+    delay_enabled: bool
     led: bool
     notifications: bool
 
@@ -85,6 +93,8 @@ class SinilinkStatus:
             "alarm_low": self.alarm_low,
             "alarm_low_enabled": self.alarm_low_enabled,
             "estop": self.estop,
+            "delay_value": self.delay_value,
+            "delay_enabled": self.delay_enabled,
             "led": self.led,
             "notifications": self.notifications,
         }
@@ -146,6 +156,8 @@ def parse_status(raw: bytes) -> SinilinkStatus:
         alarm_low=_safe_float(_get(PARAM_ALARM_LOW)),
         alarm_low_enabled=bool(_get(PARAM_ALARM_LOW_ENABLE, 0)),
         estop=bool(_get(PARAM_ESTOP, 0)),
+        delay_value=int(_get(PARAM_DELAY_VALUE, 0) or 0),
+        delay_enabled=bool(_get(PARAM_DELAY_ENABLE, 0)),
         led=bool(_get(PARAM_LED, 0)),
         notifications=bool(_get(PARAM_NOTIFICATIONS, 0)),
     )
@@ -259,7 +271,25 @@ async def async_discover(
     return list(seen.values())
 
 
-# Re-export DISCOVERY_PAYLOAD for callers that import only from this module.
+def build_mqtt_command(
+    method: str,
+    param: str | int | float,
+    epoch: int | None = None,
+) -> str:
+    """Build an MQTT command payload for the ``APPWT{MAC}`` topic.
+
+    Returns a JSON string::
+
+        {"method":"relay","param":"open","time":1775887500}
+    """
+    if epoch is None:
+        epoch = int(time.time())
+    return json.dumps(
+        {"method": method, "param": param, "time": epoch},
+        separators=(",", ":"),
+    )
+
+
 __all__ = [
     "DISCOVERY_PAYLOAD",
     "SinilinkProtocolError",
@@ -267,5 +297,6 @@ __all__ = [
     "async_discover",
     "async_query",
     "build_command",
+    "build_mqtt_command",
     "parse_status",
 ]

@@ -22,6 +22,14 @@
           "host": "IP address",
           "mac": "MAC address (AA:BB:CC:DD:EE:FF)"
         }
+      },
+      "mqtt": {
+        "title": "MQTT broker (optional)",
+        "description": "Enter the address of the local MQTT broker the device connects to. This enables write control (relay, temps, LED). Leave blank for read-only monitoring.",
+        "data": {
+          "mqtt_host": "Broker host",
+          "mqtt_port": "Broker port"
+        }
       }
     },
     "error": {
@@ -29,7 +37,8 @@
       "invalid_response": "Device replied but the response could not be parsed.",
       "mac_mismatch": "The device replied with a different MAC than entered.",
       "discovery_failed": "Broadcast discovery failed on this network.",
-      "no_devices_found": "No Sinilink devices replied to the broadcast."
+      "no_devices_found": "No Sinilink devices replied to the broadcast.",
+      "mqtt_cannot_connect": "Could not connect to the MQTT broker."
     },
     "abort": {
       "already_configured": "This device is already configured."

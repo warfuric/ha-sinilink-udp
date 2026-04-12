@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""Offline smoke test for protocol.parse_status / build_command.
+"""Offline smoke test for protocol.parse_status / build_command / build_mqtt_command.
 
 Run from the repo root:
 
     python3 scripts/test_protocol.py
 
-This does NOT touch a real device. It feeds a captured-style reply through
-the parser and round-trips a command. Replace SAMPLE_REPLY with a real
-capture once you have one (see README.md for the discovery one-liner).
+This does NOT touch a real device. It feeds a sample reply through the
+parser and round-trips commands.
 """
 from __future__ import annotations
 
@@ -42,21 +41,22 @@ def _load(name: str) -> types.ModuleType:
 _load("const")
 protocol = _load("protocol")
 
-# Real reply captured from a Sinilink XY-WFTX (78:42:1C:E4:7D:5C).
-# Note: this firmware sends pure JSON (no MAC, prefix) and uses "tim"
-# instead of "time". current_temp is at index 3, target min/max at 6/7.
+# Sample reply matching the XY-WFTX firmware format.
+# Pure JSON (no MAC prefix), uses "tim" not "time".
+TEST_MAC = "AA:BB:CC:DD:EE:FF"
 SAMPLE_REPLY = (
-    b'{"MAC":"78:42:1C:E4:7D:5C",'
+    b'{"MAC":"AA:BB:CC:DD:EE:FF",'
     b'"param":[0,"A",0,22.2,"C","H",58,65,0,0,1,70,1,10,1,0,5,1,1,0,1,0,115200,1,20482,112],'
     b'"ERR":0,"tim":1775466949}'
 )
 
 
 def main() -> int:
+    # --- Parse status ---
     status = protocol.parse_status(SAMPLE_REPLY)
     print("parsed:", json.dumps(status.as_dict(), indent=2))
 
-    assert status.mac == "78:42:1C:E4:7D:5C", status.mac
+    assert status.mac == TEST_MAC, status.mac
     assert status.epoch == 1775466949
     assert status.relay is False
     assert status.mode == "A"
@@ -69,17 +69,33 @@ def main() -> int:
     assert status.alarm_high_enabled is True
     assert status.alarm_low == 10
     assert status.alarm_low_enabled is True
-    assert status.estop is True  # this capture was taken with e-stop active
-    assert status.led is False           # LED off (param[21]=0)
-    assert status.notifications is True  # notifications on (param[20]=1)
+    assert status.estop is True   # param[17]=1
+    assert status.delay_value == 0
+    assert status.delay_enabled is False
+    assert status.led is False
+    assert status.notifications is True
 
-    # Round-trip a control command: bump stop temp to 68.
+    # --- UDP command round-trip ---
     new_param = list(status.param)
     new_param[7] = 68
-    cmd = protocol.build_command(status.mac, new_param, epoch=1775466950)
-    print("command bytes:", cmd)
-    assert cmd.startswith(b"78:42:1C:E4:7D:5C{")
+    cmd = protocol.build_command(TEST_MAC, new_param, epoch=1775466950)
+    print("UDP command:", cmd)
+    assert cmd.startswith(f"{TEST_MAC}{{".encode())
     assert b'"param":[0,"A",0,22.2,"C","H",58,68' in cmd
+
+    # --- MQTT command ---
+    mqtt_cmd = protocol.build_mqtt_command("btemp", 68, epoch=1775466950)
+    print("MQTT command:", mqtt_cmd)
+    parsed_cmd = json.loads(mqtt_cmd)
+    assert parsed_cmd["method"] == "btemp"
+    assert parsed_cmd["param"] == 68
+    assert parsed_cmd["time"] == 1775466950
+
+    # String param (relay)
+    mqtt_relay = protocol.build_mqtt_command("relay", "open", epoch=1775466951)
+    parsed_relay = json.loads(mqtt_relay)
+    assert parsed_relay["method"] == "relay"
+    assert parsed_relay["param"] == "open"
 
     print("OK")
     return 0

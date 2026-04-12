@@ -10,7 +10,14 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_MAC
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import BROADCAST_ADDR, DISCOVERY_PAYLOAD, DOMAIN
+from .const import (
+    BROADCAST_ADDR,
+    CONF_MQTT_HOST,
+    CONF_MQTT_PORT,
+    DEFAULT_MQTT_PORT,
+    DISCOVERY_PAYLOAD,
+    DOMAIN,
+)
 from .protocol import (
     SinilinkProtocolError,
     async_discover,
@@ -24,15 +31,16 @@ _LOGGER = logging.getLogger(__name__)
 class SinilinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Sinilink XY-WFTX (Local UDP)."""
 
-    VERSION = 1
+    VERSION = 2
 
     def __init__(self) -> None:
         self._discovered: dict[str, dict[str, str]] = {}
+        self._device_host: str = ""
+        self._device_mac: str = ""
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Initial menu: scan or manual."""
         return self.async_show_menu(
             step_id="user",
             menu_options=["scan", "manual"],
@@ -41,7 +49,6 @@ class SinilinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_scan(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Broadcast SINILINK521 and present discovered devices."""
         if user_input is None:
             try:
                 results = await async_discover(BROADCAST_ADDR)
@@ -62,7 +69,6 @@ class SinilinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_show_form(
                     step_id="scan",
                     errors={"base": "no_devices_found"},
-                    description_placeholders={"hint": "try manual entry"},
                     data_schema=vol.Schema({}),
                 )
 
@@ -77,12 +83,13 @@ class SinilinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         mac = user_input["device"]
         info = self._discovered[mac]
-        return await self._create_entry(info["ip"], mac)
+        self._device_host = info["ip"]
+        self._device_mac = mac
+        return await self.async_step_mqtt()
 
     async def async_step_manual(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Manual host/MAC entry with validation."""
         errors: dict[str, str] = {}
         if user_input is not None:
             host = user_input[CONF_HOST]
@@ -100,7 +107,9 @@ class SinilinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if status.mac != mac_input:
                     errors[CONF_MAC] = "mac_mismatch"
                 else:
-                    return await self._create_entry(host, status.mac)
+                    self._device_host = host
+                    self._device_mac = status.mac
+                    return await self.async_step_mqtt()
 
         return self.async_show_form(
             step_id="manual",
@@ -113,10 +122,63 @@ class SinilinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def _create_entry(self, host: str, mac: str) -> FlowResult:
+    async def async_step_mqtt(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """MQTT broker configuration (optional — skip for read-only mode)."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            mqtt_host = user_input.get(CONF_MQTT_HOST, "").strip()
+            mqtt_port = user_input.get(CONF_MQTT_PORT, DEFAULT_MQTT_PORT)
+
+            if mqtt_host:
+                # Validate connectivity
+                try:
+                    import aiomqtt
+                    async with aiomqtt.Client(mqtt_host, port=mqtt_port) as _:
+                        pass
+                except Exception:
+                    errors["base"] = "mqtt_cannot_connect"
+
+                if not errors:
+                    return await self._create_entry(
+                        self._device_host,
+                        self._device_mac,
+                        mqtt_host=mqtt_host,
+                        mqtt_port=mqtt_port,
+                    )
+            else:
+                # Skip MQTT — read-only mode
+                return await self._create_entry(
+                    self._device_host, self._device_mac
+                )
+
+        return self.async_show_form(
+            step_id="mqtt",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_MQTT_HOST, default=""): str,
+                    vol.Optional(CONF_MQTT_PORT, default=DEFAULT_MQTT_PORT): int,
+                }
+            ),
+            errors=errors,
+        )
+
+    async def _create_entry(
+        self,
+        host: str,
+        mac: str,
+        mqtt_host: str | None = None,
+        mqtt_port: int | None = None,
+    ) -> FlowResult:
         await self.async_set_unique_id(mac)
         self._abort_if_unique_id_configured(updates={CONF_HOST: host})
         return self.async_create_entry(
             title=f"Sinilink {mac}",
-            data={CONF_HOST: host, CONF_MAC: mac},
+            data={
+                CONF_HOST: host,
+                CONF_MAC: mac,
+                CONF_MQTT_HOST: mqtt_host,
+                CONF_MQTT_PORT: mqtt_port,
+            },
         )

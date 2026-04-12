@@ -56,7 +56,7 @@ class SinilinkEStopSensor(CoordinatorEntity[SinilinkCoordinator], BinarySensorEn
 
 
 class SinilinkLedSensor(CoordinatorEntity[SinilinkCoordinator], BinarySensorEntity):
-    """LED state from the device (param[21])."""
+    """LED state from the device. Firmware inverted: param[21]=0 means on."""
 
     _attr_has_entity_name = True
     _attr_name = "LED"
@@ -74,7 +74,9 @@ class SinilinkLedSensor(CoordinatorEntity[SinilinkCoordinator], BinarySensorEnti
     @property
     def is_on(self) -> bool | None:
         data = self.coordinator.data
-        return data.led if data else None
+        if data is None:
+            return None
+        return not data.led  # inverted: param 0 = on, 1 = off
 
 
 class SinilinkTempAlarmSensor(CoordinatorEntity[SinilinkCoordinator], BinarySensorEntity):
