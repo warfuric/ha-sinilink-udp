@@ -1,7 +1,7 @@
 # Sinilink XY-WFTX — Home Assistant integration
 
 <p align="center">
-  <img src="assets/brand/icon@2x.png" width="256" alt="Sinilink XY-WFTX chamber heater">
+  <img src="assets/brand/icon@2x.png" width="200" alt="Sinilink">
 </p>
 
 Local monitoring and control of the Sinilink XY-WFTX WiFi thermostat. No cloud dependency, no firmware flashing.
@@ -11,6 +11,10 @@ Local monitoring and control of the Sinilink XY-WFTX WiFi thermostat. No cloud d
 Built and verified against the **D3D Store "Chamber Heater for Bambu Lab P1S / X1C / P1P"** kit:
 
 **[AliExpress listing](https://www.aliexpress.com/item/1005007451846333.html)**
+
+<p align="center">
+  <img src="assets/device-photo.png" width="220" alt="Sinilink XY-WFTX chamber heater">
+</p>
 
 The kit bundles a PTC heating element with the Sinilink XY-WFTX WiFi thermostat controller (ESP8285, 10A relay, NTC + DS18B20 inputs). Other kits using the same XY-WFTX module should also work but are unverified.
 
